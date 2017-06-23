@@ -6,6 +6,7 @@
  * Ivan De Cesaris (ivan.de.cesaris@intel.com)
  * Julien Carreno (julien.carreno@intel.com)
  * Jeffrey Maxwell (jeffrey.r.maxwell@intel.com)
+ * Jessica Gomez (jessica.gomez.hernandez@intel.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,6 +48,7 @@ extern const struct command_registration x86_32_command_handlers[];
 #define EFLAGS_IF		((uint32_t)0x00000200) /* Interrupt Flag */
 #define EFLAGS_RF		((uint32_t)0x00010000) /* Resume Flag */
 #define EFLAGS_VM86		((uint32_t)0x00020000) /* Virtual 8086 Mode */
+#define EFLAGS_ID		((uint32_t)0x00200000) /* CPUID  capable */
 
 #define CSAR_DPL		((uint32_t)0x00006000)
 #define CSAR_D			((uint32_t)0x00400000)
@@ -193,6 +195,10 @@ enum {
 	SRAM2PDR,
 	PDR2SRAM,
 	WBINVD,
+	/* Model Specific Registers */
+	RDMSR,
+	WRMSR,
+	CPUID,
 };
 
 enum x86_core_type {
@@ -235,6 +241,7 @@ struct x86_32_common {
 	int (*disable_paging)(struct target *t);
 	int (*enable_paging)(struct target *t);
 	bool (*sw_bpts_supported)(struct target *t);
+	bool (*io_bpts_supported)(struct target *t);
 	int (*transaction_status)(struct target *t);
 	int (*submit_instruction)(struct target *t, int num);
 	int (*read_hw_reg)(struct target *t, int reg, uint32_t *regval, uint8_t cache);
@@ -270,8 +277,8 @@ struct x86_32_dbg_reg {
 #define DR7_RW_LEN_SIZE			4
 #define DR7_BP_EXECUTE			0 /* 00 - only on instruction execution*/
 #define DR7_BP_WRITE			1 /* 01 - only on data writes */
-/*#define DR7_RW_IORW			2 UNSUPPORTED 10 - an I/O read and I/O write */
-#define DR7_BP_READWRITE		3 /* on data read or data write */
+#define DR7_RW_IO				2 /* 10 - on I/O read or write */
+#define DR7_BP_READWRITE		3 /* 11 - on data read or data write */
 #define DR7_BP_LENGTH_1			0 /* 00 - 1 byte length */
 #define DR7_BP_LENGTH_2			1 /* 01 - 2 byte length */
 #define DR7_BP_LENGTH_4			3 /* 11 - 4 byte length */
@@ -293,6 +300,9 @@ struct x86_32_dbg_reg {
 
 #define DR7_SET_WRITE(val, regnum) \
 	(val |= (DR7_BP_WRITE << (DR7_RW_SHIFT + DR7_RW_LEN_SIZE * (regnum))))
+
+#define DR7_SET_IO(val, regnum) \
+	(val |= (DR7_RW_IO << (DR7_RW_SHIFT + DR7_RW_LEN_SIZE * (regnum))))
 
 #define DR7_SET_ACCESS(val, regnum) \
 	(val |= (DR7_BP_READWRITE << (DR7_RW_SHIFT + DR7_RW_LEN_SIZE * (regnum))))
@@ -326,5 +336,6 @@ int x86_32_common_add_breakpoint(struct target *t, struct breakpoint *bp);
 int x86_32_common_remove_breakpoint(struct target *t, struct breakpoint *bp);
 int x86_32_common_add_watchpoint(struct target *t, struct watchpoint *wp);
 int x86_32_common_remove_watchpoint(struct target *t, struct watchpoint *wp);
+void x86_32_common_reset_breakpoints_watchpoints(struct target *t);
 
 #endif /* OPENOCD_TARGET_X86_32_COMMON_H */
